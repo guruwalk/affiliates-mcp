@@ -1,0 +1,219 @@
+{
+  "tools": [
+    {
+      "name": "discover_destination",
+      "description": "Find free walking tours available in a city. Returns the destination info, tour categories to browse, and a paginated list of featured tours. Optionally filter by date range and language.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["destination"],
+        "properties": {
+          "destination": {
+            "type": "string",
+            "description": "City or destination name, e.g. 'Rome', 'Barcelona'"
+          },
+          "language": {
+            "type": "string",
+            "description": "Language for tour names and descriptions",
+            "enum": ["en", "es", "de", "it"],
+            "default": "en"
+          },
+          "start_date": {
+            "type": "string",
+            "description": "Only show tours available from this date (YYYY-MM-DD)"
+          },
+          "end_date": {
+            "type": "string",
+            "description": "Only show tours available until this date (YYYY-MM-DD)"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number for the featured tours list",
+            "default": 1
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "place": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "name": { "type": "string" },
+              "slug": { "type": "string" },
+              "country": { "type": "string" },
+              "has_free_tours": { "type": "boolean" }
+            },
+            "required": ["id", "name", "slug", "country", "has_free_tours"]
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": { "type": "integer" },
+              "per_page": { "type": "integer" },
+              "total_count": { "type": "integer" }
+            },
+            "required": ["page", "per_page", "total_count"]
+          },
+          "categories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "name": { "type": ["string", "null"] },
+                "url": { "type": "string" }
+              },
+              "required": ["id", "url"]
+            }
+          },
+          "featured_products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "name": { "type": "string" },
+                "slug": { "type": "string" },
+                "rating_out_of_5": { "type": "number" },
+                "reviews_count": { "type": "integer" },
+                "image_url": { "type": ["string", "null"] },
+                "url": { "type": "string" }
+              },
+              "required": ["id", "name", "slug", "rating", "reviews_count", "url"]
+            }
+          }
+        },
+        "required": ["place", "pagination", "categories", "featured_products"]
+      }
+    },
+    {
+      "name": "browse_category",
+      "description": "List free walking tours within a category. Use a category_id from discover_destination results. Returns paginated tours with ratings, images, and booking URLs.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["category_id"],
+        "properties": {
+          "category_id": {
+            "type": "integer",
+            "description": "Category ID returned by discover_destination"
+          },
+          "language": {
+            "type": "string",
+            "description": "Language for tour names and category labels",
+            "enum": ["en", "es", "de", "it"],
+            "default": "en"
+          },
+          "page": {
+            "type": "integer",
+            "description": "Page number for paginated results",
+            "default": 1
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "integer" },
+              "name": { "type": ["string", "null"] },
+              "url": { "type": "string" }
+            },
+            "required": ["id", "url"]
+          },
+          "place": {
+            "type": "object",
+            "properties": {
+              "name": { "type": ["string", "null"] },
+              "slug": { "type": "string" }
+            },
+            "required": ["slug"]
+          },
+          "pagination": {
+            "type": "object",
+            "properties": {
+              "page": { "type": "integer" },
+              "per_page": { "type": "integer" },
+              "total_count": { "type": "integer" }
+            },
+            "required": ["page", "per_page", "total_count"]
+          },
+          "products": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "integer" },
+                "name": { "type": "string" },
+                "slug": { "type": "string" },
+                "rating_out_of_5": { "type": "number" },
+                "reviews_count": { "type": "integer" },
+                "image_url": { "type": ["string", "null"] },
+                "url": { "type": "string" }
+              },
+              "required": ["id", "name", "slug", "rating_out_of_5", "reviews_count", "url"]
+            }
+          }
+        },
+        "required": ["category", "place", "pagination", "products"]
+      }
+    },
+    {
+      "name": "check_availability",
+      "description": "Check when a free walking tour has upcoming events. Use a tour_id from discover_destination or browse_category results. Returns available time slots with dates, times, languages, and booking URLs.",
+      "inputSchema": {
+        "type": "object",
+        "required": ["tour_id", "from_date", "to_date"],
+        "properties": {
+          "tour_id": {
+            "type": "integer",
+            "description": "Tour ID from discover_destination or browse_category results"
+          },
+          "from_date": {
+            "type": "string",
+            "description": "Start of date range (YYYY-MM-DD)"
+          },
+          "to_date": {
+            "type": "string",
+            "description": "End of date range (YYYY-MM-DD)"
+          },
+          "language": {
+            "type": "string",
+            "description": "Language for tour names and descriptions",
+            "enum": ["en", "es", "de", "it"],
+            "default": "en"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "tour_id": { "type": "integer" },
+          "from_date": { "type": "string" },
+          "to_date": { "type": "string" },
+          "dates": {
+            "type": "object",
+            "description": "Keys are dates (YYYY-MM-DD). Each value is an array of events on that date, or an empty array if no events.",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "event_id": { "type": "integer" },
+                  "start_time": { "type": "string" },
+                  "language": { "type": "string" },
+                  "last_seats": { "type": "boolean" },
+                  "booking_url": { "type": "string" }
+                },
+                "required": ["event_id", "start_time", "language", "last_seats", "booking_url"]
+              }
+            }
+          }
+        },
+        "required": ["tour_id", "from_date", "to_date", "dates"]
+      }
+    }
+  ]
+}
