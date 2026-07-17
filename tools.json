@@ -80,7 +80,7 @@
                 "image_url": { "type": ["string", "null"] },
                 "url": { "type": "string" }
               },
-              "required": ["id", "name", "slug", "rating", "reviews_count", "url"]
+              "required": ["id", "name", "slug", "rating_out_of_5", "reviews_count", "url"]
             }
           }
         },
