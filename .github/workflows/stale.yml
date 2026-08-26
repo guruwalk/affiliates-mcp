@@ -1,0 +1,25 @@
+name: Close stale PRs
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-issue-stale: -1
+          days-before-issue-close: -1
+
+          days-before-pr-stale: 30
+          days-before-pr-close: 7
+          stale-pr-message: "Esta PR lleva 30 días sin actividad. Se cerrará en 7 días si no hay movimiento."
+          close-pr-message: "Cerrada automáticamente por inactividad."
+          stale-pr-label: "stale"
+          exempt-pr-labels: "keep-open"
