@@ -34,6 +34,14 @@ Requests without a valid key receive `401 Unauthorized`.
 
 ---
 
+## Rate limits
+
+Each IP address can make up to 300 requests every 5 minutes. Every MCP message counts as a request, including `initialize`. Above the limit, the server responds with HTTP 429 until the 5-minute window resets.
+
+Reuse a single MCP client instead of initializing one for each call, because every initialization also counts.
+
+---
+
 ## Protocol
 
 This server follows the [MCP specification](https://modelcontextprotocol.io). Use any MCP-compatible client library:
