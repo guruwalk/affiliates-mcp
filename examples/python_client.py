@@ -1,94 +1,107 @@
 """
-GuruWalk MCP Affiliate Client — Python example
-Requires: pip install mcp httpx
+GuruWalk affiliate MCP server: Python example.
 
-This example connects to the GuruWalk affiliate MCP server and calls
-discover_destination to find free tours in a city.
+Connects to the server, lists its tools and calls discover_destination to
+find free tours in a city.
+
+Requires Python 3.10+ and version 2 of the MCP SDK:
+
+    pip install "mcp>=2"
+    python examples/python_client.py
+
+Reference for every tool, parameter and response field: the "Tools" section
+of this repository's README, https://github.com/guruwalk/affiliates-mcp#tools
 """
 
 import asyncio
 import json
+from typing import Any
 
-import httpx
-from mcp import ClientSession
+import httpx2  # installed with the MCP SDK
+from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
+from mcp.types import CallToolResult, TextContent
 
-# Replace with your affiliate API key.
-API_KEY = "your_api_key_here"
+# Replace with your affiliate API key (the "API key" section of your affiliate panel).
+API_KEY = "YOUR_API_KEY"
 
-# The GuruWalk affiliate MCP endpoint.
 MCP_URL = "https://back.guruwalk.com/mcp/affiliates"
 
 
+def parse_tool_result(result: CallToolResult) -> dict[str, Any]:
+    """Return the data of a tool call.
+
+    The server sends it as a JSON string inside the first text block, not as
+    structured content, so it has to be parsed.
+    """
+    block = result.content[0] if result.content else None
+    if not isinstance(block, TextContent):
+        raise TypeError("The tool result does not start with a text block")
+
+    if result.is_error:
+        # The text is either {"error": "<message>"} or a plain message
+        # (for example, when a required argument is missing).
+        try:
+            message = json.loads(block.text)["error"]
+        except (ValueError, KeyError, TypeError):
+            message = block.text
+        raise RuntimeError(f"The tool returned an error: {message}")
+
+    return json.loads(block.text)
+
+
 async def main() -> None:
-    # Build an httpx.AsyncClient that includes the auth header on every request.
-    # The server also accepts "Api-Key: <key>" as an alternative header.
-    http_client = httpx.AsyncClient(
+    # The key goes in a header on every request; a key in the URL is not read.
+    # "Api-Key: YOUR_API_KEY" is accepted as an alternative header. A missing
+    # or invalid key is rejected with HTTP 401.
+    http_client = httpx2.AsyncClient(
         headers={"Authorization": f"Bearer {API_KEY}"},
-        # connect / read timeouts — adjust as needed
-        timeout=httpx.Timeout(10.0, read=30.0),
+        timeout=httpx2.Timeout(10.0, read=30.0),
     )
 
     async with http_client:
-        # Open the Streamable HTTP transport to the remote server.
-        # The server is stateless: each call is an independent HTTP request,
-        # so no session ID is retained between calls.
-        async with streamable_http_client(
-            url=MCP_URL,
-            http_client=http_client,
-        ) as (read_stream, write_stream, _):
-            # Wrap the streams in an MCP ClientSession, which handles the
-            # JSON-RPC message framing defined by the MCP spec.
-            async with ClientSession(read_stream, write_stream) as session:
-                # Send the MCP initialize handshake.
-                await session.initialize()
+        transport = streamable_http_client(MCP_URL, http_client=http_client)
 
-                # (Optional) List available tools to confirm the connection.
-                tools_result = await session.list_tools()
-                tool_names = [t.name for t in tools_result.tools]
-                print(f"Available tools: {tool_names}")
+        # mode="legacy" connects with the initialize handshake.
+        async with Client(transport, mode="legacy") as client:
+            tools = await client.list_tools()
+            print("Available tools:", [tool.name for tool in tools.tools])
 
-                # Call discover_destination to find free tours in Rome.
-                result = await session.call_tool(
-                    "discover_destination",
-                    arguments={
-                        "destination": "Rome",
-                        "language": "en",
-                        # Optionally filter by date range:
-                        # "start_date": "2025-06-10",
-                        # "end_date": "2025-06-20",
-                        "page": 1,
-                    },
-                )
+            result = await client.call_tool(
+                "discover_destination",
+                {
+                    "destination": "Rome",
+                    # Besides translating names, it filters: only tours
+                    # offered in this language are listed.
+                    "language": "en",
+                    # Optional date range. Send both dates or neither; without
+                    # them the server uses the next 30 days.
+                    # "start_date": "YYYY-MM-DD",
+                    # "end_date": "YYYY-MM-DD",
+                    "page": 1,
+                },
+            )
+            data = parse_tool_result(result)
 
-                # The tool returns its output as a JSON string inside the
-                # first text content block.
-                raw_text = result.content[0].text
-                data = json.loads(raw_text)
+            place = data["place"]
+            print(f"\nDestination: {place['name']}, {place['country']}")
+            print(f"Has free tours: {place['has_free_tours']}")
 
-                # Print destination summary.
-                place = data["place"]
-                print(f"\nDestination: {place['name']}, {place['country']}")
-                print(f"Has free tours: {place['has_free_tours']}")
+            # A category id is the category_id argument of browse_category.
+            print("\nCategories:")
+            for category in data["categories"]:
+                print(f"  [{category['id']}] {category['name']}: {category['url']}")
 
-                # Print available categories.
-                print("\nCategories:")
-                for cat in data["categories"]:
-                    print(f"  [{cat['id']}] {cat['name']}  →  {cat['url']}")
-
-                # Print featured tours.
-                pagination = data["pagination"]
+            # A tour id is the tour_id argument of check_availability.
+            pagination = data["pagination"]
+            print(f"\nTours (page {pagination['page']}, {pagination['total_count']} in total):")
+            for tour in data["featured_products"]:
                 print(
-                    f"\nFeatured tours "
-                    f"(page {pagination['page']} of "
-                    f"{-(-pagination['total_count'] // pagination['per_page'])}):"
+                    f"  [{tour['id']}] {tour['name']}"
+                    f" - {tour['rating_out_of_5']}/5 ({tour['reviews_count']} reviews)"
                 )
-                for product in data["featured_products"]:
-                    print(
-                        f"  [{product['id']}] {product['name']}"
-                        f"  ★ {product['rating_out_of_5']}/5 ({product['reviews_count']} reviews)"
-                    )
-                    print(f"      {product['url']}")
+                # Every link already carries your affiliate code (ref=...).
+                print(f"      {tour['url']}")
 
 
 if __name__ == "__main__":
